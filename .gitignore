@@ -5,9 +5,6 @@
 .env.local
 .env.*.local
 
-# Keep example env file
-!.env.example
-
 # =========================
 # Python cache
 # =========================
@@ -16,7 +13,7 @@ __pycache__/
 *$py.class
 
 # =========================
-# Virtual environments
+# Virtual environment
 # =========================
 .venv/
 venv/
@@ -29,7 +26,7 @@ env/
 Thumbs.db
 
 # =========================
-# IDE files
+# IDE/editor files
 # =========================
 .vscode/
 .idea/
@@ -41,12 +38,13 @@ Thumbs.db
 logs/
 
 # =========================
-# Uploaded user documents
-# Tax documents are sensitive, so do not commit them
+# Sensitive uploaded documents
+# Tax documents should not go to GitHub
 # =========================
 uploads/
 documents/
 data/private/
+
 *.pdf
 *.docx
 *.xlsx
@@ -60,12 +58,12 @@ reports/
 generated/
 
 # =========================
-# Jupyter
+# Jupyter Notebook checkpoints
 # =========================
 .ipynb_checkpoints/
 
 # =========================
-# Testing/cache
+# Testing and tool cache
 # =========================
 .pytest_cache/
 .mypy_cache/

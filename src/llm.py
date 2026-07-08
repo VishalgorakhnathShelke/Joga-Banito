@@ -3,8 +3,7 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
 
-
-from config import (
+from src.config import (
     GEMINI_API_KEY,
     GEMINI_MODEL,
     GROQ_API_KEY,
@@ -14,23 +13,19 @@ from config import (
 
 def get_gemini_llm():
     """
-    Create and return the Gemini LLM.
-
-    This model will be used for Agent 1:
+    Gemini is used as Agent 1:
     CA Tax Guidance Agent.
     """
     return ChatGoogleGenerativeAI(
         model=GEMINI_MODEL,
-        google_api_key=GEMINI_API_KEY,
+        api_key=GEMINI_API_KEY,
         temperature=0.3,
     )
 
 
 def get_groq_llm():
     """
-    Create and return the Groq LLM.
-
-    This model will be used for Agent 2:
+    Groq is used as Agent 2:
     Senior CA Compliance Review Agent.
     """
     return ChatGroq(
@@ -38,6 +33,16 @@ def get_groq_llm():
         api_key=GROQ_API_KEY,
         temperature=0.2,
     )
+
+
+def extract_response_text(response) -> str:
+    """
+    Safely extract text from LangChain response objects.
+    """
+    if hasattr(response, "content"):
+        return response.content
+
+    return str(response)
 
 
 if __name__ == "__main__":

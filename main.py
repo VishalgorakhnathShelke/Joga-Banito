@@ -3,7 +3,7 @@
 from rich.console import Console
 from rich.panel import Panel
 
-from src.pipeline import run_tax_guidance_pipeline
+from src.graph_workflow import run_langgraph_tax_agent
 
 
 console = Console()
@@ -11,7 +11,7 @@ console = Console()
 
 def show_welcome_message() -> None:
     """
-    Show a simple welcome message when the app starts.
+    Show welcome and safety message.
     """
 
     welcome_text = """
@@ -20,6 +20,9 @@ AI Tax Guidance and Compliance Review Agent
 This tool provides educational guidance only.
 It does not replace a registered tax agent.
 It does not guarantee that any claim will be accepted by the ATO.
+
+Official ATO/TPB-style sources are used for tax guidance.
+Reddit can be shown only as optional public discussion context.
 """
 
     console.print(
@@ -44,15 +47,26 @@ def get_user_question() -> str:
     return user_question.strip()
 
 
+def ask_include_reddit() -> bool:
+    """
+    Ask whether user wants to see Reddit/public discussion context.
+    """
+
+    console.print(
+        "\nDo you want to also see Reddit/public discussion context?"
+    )
+    console.print(
+        "Note: Reddit is not official tax guidance. It only shows what people discuss publicly.\n"
+    )
+
+    answer = input("Include Reddit context? (y/n): ").strip().lower()
+
+    return answer in ["y", "yes"]
+
+
 def main() -> None:
     """
-    Main entry point for the terminal app.
-
-    Flow:
-    1. Show welcome/disclaimer message
-    2. Ask user for a tax question
-    3. Send question to the two-agent pipeline
-    4. Print final reviewed guidance
+    Main terminal entry point.
     """
 
     show_welcome_message()
@@ -60,21 +74,38 @@ def main() -> None:
     user_question = get_user_question()
 
     if not user_question:
-        console.print("[red]No question entered. Please run the app again and enter a valid question.[/red]")
+        console.print("[red]No question entered. Please run again and enter a valid question.[/red]")
         return
 
-    console.print("\n[yellow]Running the two-agent review process...[/yellow]")
+    include_reddit = ask_include_reddit()
 
-    final_answer = run_tax_guidance_pipeline(user_question)
+    console.print("\n[yellow]Running LangGraph tax guidance workflow...[/yellow]")
+    console.print("[yellow]Step 1: Searching official sources...[/yellow]")
+    console.print("[yellow]Step 2: Running Agent 1...[/yellow]")
+    console.print("[yellow]Step 3: Verifying with Agent 2...[/yellow]\n")
 
-    console.print("\n")
-    console.print(
-        Panel(
-            final_answer,
-            title="Final Reviewed Tax Guidance",
-            border_style="green",
+    try:
+        final_answer = run_langgraph_tax_agent(
+            user_question=user_question,
+            include_reddit=include_reddit,
         )
-    )
+
+        console.print(
+            Panel(
+                final_answer,
+                title="Final Reviewed Tax Guidance",
+                border_style="green",
+            )
+        )
+
+    except Exception as error:
+        console.print(
+            Panel(
+                str(error),
+                title="Error",
+                border_style="red",
+            )
+        )
 
 
 if __name__ == "__main__":

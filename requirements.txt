@@ -1,41 +1,13 @@
-# =========================
-# Core LLM and Agent Packages
-# =========================
 langchain
 langchain-core
 langchain-community
-langchain-openai
+langchain-google-genai
 langchain-groq
-langchain-tavily
 langgraph
 
-# =========================
-# Environment Variables
-# =========================
 python-dotenv
-
-# =========================
-# Web Search and Website Reading
-# =========================
-requests
-beautifulsoup4
 tavily-python
-
-# =========================
-# File Reading
-# =========================
-pypdf
-python-docx
-pandas
-openpyxl
-
-# =========================
-# Terminal Display
-# =========================
 rich
 
-# =========================
-# Utilities
-# =========================
 pydantic
 typing-extensions

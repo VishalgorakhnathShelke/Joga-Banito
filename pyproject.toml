@@ -1,15 +1,42 @@
 [project]
-name = "langchainupdated"
+name = "ai-tax-guidance-agent"
 version = "0.1.0"
-description = "Add your description here"
+description = "AI Tax Guidance and Compliance Review Agent for Australian tax filing support"
 readme = "README.md"
-requires-python = ">=3.13"
-dependencies = [
-    "ipykernel>=7.1.0",
-    "langchain>=1.1.0",
-    "langchain-community>=0.4.1",
-    "langchain-google-genai>=3.2.0",
-    "langchain-groq>=1.1.0",
-    "langchain-openai>=1.1.0",
-    "python-dotenv>=1.2.1",
+requires-python = ">=3.10"
+authors = [
+    { name = "Nishita" }
 ]
+
+dependencies = [
+    "langchain",
+    "langchain-core",
+    "langchain-community",
+    "langchain-openai",
+    "langchain-groq",
+    "langchain-tavily",
+    "langgraph",
+    "python-dotenv",
+    "requests",
+    "beautifulsoup4",
+    "tavily-python",
+    "pypdf",
+    "python-docx",
+    "pandas",
+    "openpyxl",
+    "rich",
+    "pydantic",
+    "typing-extensions"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff"
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

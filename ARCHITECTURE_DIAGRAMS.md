@@ -2,7 +2,9 @@
 
 This document explains the current code structure in simple language.
 
-The project is now a LangGraph-based terminal app. The user enters an Australian tax question and chooses whether Reddit/public discussion should be included. The app searches official ATO/TPB sources with Tavily, optionally searches Reddit, asks Gemini to create the first tax guidance answer, searches official sources again to verify that answer, asks Groq to perform the compliance review, and prints the final safer answer.
+The project is now a LangGraph-based terminal app. The user enters an Australian tax question and chooses whether Reddit/public discussion should be included. The app searches official ATO/TPB sources with Tavily, optionally searches Reddit, keeps source results as structured citation records, grades the strength of official evidence, identifies missing facts that may need clarification, asks Gemini to create the first tax guidance answer, searches official sources again to verify that answer, asks Groq to perform the compliance review with mandatory citations, and prints the final safer answer.
+
+The Mermaid diagrams in this file are the source of truth for the current architecture.
 
 ## 1. Big Picture System Diagram
 
@@ -14,20 +16,22 @@ flowchart TB
 
     subgraph workflow["src/graph_workflow.py - LangGraph workflow"]
         direction LR
-        search1["Node 1<br/>Search sources<br/>for Agent 1"]
-        agent1["Node 2<br/>Gemini Agent 1<br/>CA guidance draft"]
-        search2["Node 3<br/>Search fresh<br/>verification sources"]
-        agent2["Node 4<br/>Groq Agent 2<br/>compliance review"]
-        search1 --> agent1 --> search2 --> agent2
+        search1["Node 1<br/>Search structured sources<br/>for Agent 1"]
+        grade["Node 2<br/>Evidence grade<br/>+ clarification check"]
+        agent1["Node 3<br/>Gemini Agent 1<br/>cited guidance draft"]
+        search2["Node 4<br/>Search fresh<br/>verification sources"]
+        agent2["Node 5<br/>Groq Agent 2<br/>cited compliance review"]
+        search1 --> grade --> agent1 --> search2 --> agent2
     end
 
-    final["Final reviewed guidance<br/>printed in terminal"]
+    final["Final reviewed guidance<br/>with Sources checked<br/>printed in terminal"]
 
     subgraph support["Shared support files"]
         direction LR
-        prompts["src/prompts.py<br/>prompt templates"]
+        prompts["src/prompts.py<br/>citation + compliance prompts"]
         llm["src/llm.py<br/>LLM builders"]
         config["src/config.py + .env<br/>keys, models, tax settings"]
+        tools["src/tools/Web_search.py<br/>structured source helpers"]
     end
 
     subgraph services["External services and sources"]
@@ -41,6 +45,7 @@ flowchart TB
     workflow --> final --> main
 
     support -. "prompts, LLM builders,<br/>keys and settings" .-> workflow
+    tools -. "creates structured source records" .-> workflow
     workflow -. "searches through" .-> tavily
     tavily --> official
     tavily -. "only if user says yes" .-> reddit
@@ -57,8 +62,8 @@ flowchart TB
     class user person
     class main app
     class workflow graphNode
-    class search1,search2,prompts,llm,config search
-    class agent1,agent2 agent
+    class search1,search2,prompts,llm,config,tools search
+    class grade,agent1,agent2 agent
     class tavily,official,reddit external
     class final output
 ```
@@ -80,20 +85,21 @@ flowchart TD
     subgraph graph_phase["LangGraph phase - src/graph_workflow.py"]
         direction LR
         n1["8. search_agent_1_sources"]
-        n2["9. agent_1_tax_answer"]
-        n3["10. search_agent_2_verification_sources"]
-        n4["11. agent_2_compliance_review"]
-        n1 --> n2 --> n3 --> n4
+        n2["9. grade_evidence_and_clarify"]
+        n3["10. agent_1_tax_answer"]
+        n4["11. search_agent_2_verification_sources"]
+        n5["12. agent_2_compliance_review"]
+        n1 --> n2 --> n3 --> n4 --> n5
     end
 
-    output["12. Print final answer<br/>inside Rich panel"]
+    output["13. Print final answer<br/>inside Rich panel"]
     catch["If exception happens<br/>print Error panel"]
 
     start --> welcome --> question --> valid
     valid -->|"no"| error
     valid -->|"yes"| reddit_choice --> status --> run
     run --> n1
-    n4 --> output
+    n5 --> output
     run -. "try / except" .-> catch
 
     classDef startEnd fill:#bbf7d0,stroke:#15803d,color:#14532d,stroke-width:3px
@@ -105,7 +111,7 @@ flowchart TD
     class start,output startEnd
     class welcome,question,reddit_choice,status,run app
     class valid decision
-    class n1,n2,n3,n4 node
+    class n1,n2,n3,n4,n5 node
     class error,catch stopNode
 ```
 
@@ -117,11 +123,11 @@ flowchart TD
     root["JogaBanito project folder"]
 
     main["main.py<br/>terminal entry point"]
-    workflow["src/graph_workflow.py<br/>LangGraph state, nodes,<br/>search helpers, graph runner"]
-    prompts["src/prompts.py<br/>CA and compliance prompts"]
+    workflow["src/graph_workflow.py<br/>LangGraph state, evidence grading,<br/>clarification checks, graph runner"]
+    prompts["src/prompts.py<br/>CA and compliance prompts<br/>with citation rules"]
     llm["src/llm.py<br/>Gemini/Groq client builders<br/>extract_response_text()"]
     config["src/config.py<br/>loads .env and defaults"]
-    tools["src/tools/Web_search.py<br/>standalone Tavily search helper module"]
+    tools["src/tools/Web_search.py<br/>structured Tavily search helper module"]
     init["src/__init__.py<br/>package marker"]
     tools_init["src/tools/__init__.py<br/>tools package marker"]
 
@@ -155,6 +161,7 @@ flowchart TD
     workflow -->|"uses prompts"| prompts
     workflow -->|"uses LLM builders"| llm
     workflow -->|"uses settings"| config
+    workflow -->|"uses structured source helpers"| tools
     llm -->|"uses model keys"| config
     config -->|"loads"| env
     tools -->|"also uses"| config
@@ -180,22 +187,25 @@ flowchart TD
 %%{init: {"theme": "base", "themeVariables": {"background": "#ffffff", "primaryTextColor": "#111827", "textColor": "#111827", "lineColor": "#334155", "edgeLabelBackground": "#ffffff", "fontFamily": "Arial", "fontSize": "18px"}}}%%
 flowchart LR
     start(["START"])
-    state0["Initial TaxAgentState<br/>user_question<br/>include_reddit<br/>empty answer/source fields"]
+    state0["Initial TaxAgentState<br/>user_question<br/>include_reddit<br/>empty structured source fields"]
 
     node1["search_agent_1_sources<br/>official ATO/TPB search<br/>optional Reddit search"]
-    state1["State update<br/>agent_1_official_sources<br/>agent_1_reddit_context"]
+    state1["State update<br/>agent_1_official_sources<br/>agent_1_reddit_sources<br/>structured SearchSource records"]
 
-    node2["agent_1_tax_answer<br/>Gemini uses CA_AGENT_PROMPT"]
-    state2["State update<br/>agent_1_answer"]
+    node2["grade_evidence_and_clarify<br/>score official evidence<br/>detect missing material facts"]
+    state2["State update<br/>evidence_grade<br/>evidence_summary<br/>clarification_questions"]
 
-    node3["search_agent_2_verification_sources<br/>fresh official verification search<br/>optional Reddit verification context"]
-    state3["State update<br/>agent_2_official_sources<br/>agent_2_reddit_context"]
+    node3["agent_1_tax_answer<br/>Gemini uses CA_AGENT_PROMPT<br/>with citations + missing facts"]
+    state3["State update<br/>agent_1_answer"]
 
-    node4["agent_2_compliance_review<br/>Groq uses COMPLIANCE_AGENT_PROMPT"]
-    state4["State update<br/>final_answer"]
+    node4["search_agent_2_verification_sources<br/>fresh official verification search<br/>optional Reddit context"]
+    state4["State update<br/>agent_2_official_sources<br/>official_source_citations"]
+
+    node5["agent_2_compliance_review<br/>Groq uses COMPLIANCE_AGENT_PROMPT<br/>mandatory Sources checked section"]
+    state5["State update<br/>final_answer"]
     endNode(["END"])
 
-    start --> state0 --> node1 --> state1 --> node2 --> state2 --> node3 --> state3 --> node4 --> state4 --> endNode
+    start --> state0 --> node1 --> state1 --> node2 --> state2 --> node3 --> state3 --> node4 --> state4 --> node5 --> state5 --> endNode
 
     classDef startEnd fill:#bbf7d0,stroke:#15803d,color:#14532d,stroke-width:3px
     classDef state fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:3px
@@ -203,9 +213,9 @@ flowchart LR
     classDef agent fill:#ede9fe,stroke:#7c3aed,color:#3b0764,stroke-width:3px
 
     class start,endNode startEnd
-    class state0,state1,state2,state3,state4 state
-    class node1,node3 search
-    class node2,node4 agent
+    class state0,state1,state2,state3,state4,state5 state
+    class node1,node4 search
+    class node2,node3,node5 agent
 ```
 
 ## 5. Configuration and External Services
@@ -253,13 +263,14 @@ flowchart LR
 %%{init: {"theme": "base", "themeVariables": {"background": "#ffffff", "primaryTextColor": "#111827", "textColor": "#111827", "lineColor": "#334155", "edgeLabelBackground": "#ffffff", "fontFamily": "Arial", "fontSize": "18px"}}}%%
 flowchart LR
     input["Question + Reddit choice"]
-    sources1["ATO/TPB sources<br/>optional Reddit context"]
-    draft["Gemini Agent 1<br/>draft answer"]
-    sources2["Fresh ATO/TPB verification<br/>optional Reddit context"]
-    final["Groq Agent 2<br/>final reviewed answer"]
+    sources1["Structured ATO/TPB sources<br/>optional Reddit context"]
+    grade["Evidence grade<br/>+ clarification questions"]
+    draft["Gemini Agent 1<br/>cited draft answer"]
+    sources2["Fresh structured verification<br/>source citation list"]
+    final["Groq Agent 2<br/>final cited answer"]
     terminal["Terminal output"]
 
-    input --> sources1 --> draft --> sources2 --> final --> terminal
+    input --> sources1 --> grade --> draft --> sources2 --> final --> terminal
 
     classDef inputNode fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:3px
     classDef sourceNode fill:#cffafe,stroke:#0891b2,color:#164e63,stroke-width:3px
@@ -268,7 +279,7 @@ flowchart LR
 
     class input inputNode
     class sources1,sources2 sourceNode
-    class draft,final agent
+    class grade,draft,final agent
     class terminal output
 ```
 
@@ -278,24 +289,26 @@ flowchart LR
 %%{init: {"theme": "base", "themeVariables": {"background": "#ffffff", "primaryTextColor": "#111827", "textColor": "#111827", "lineColor": "#334155", "edgeLabelBackground": "#ffffff", "fontFamily": "Arial", "fontSize": "18px"}}}%%
 flowchart TD
     workflow["src/graph_workflow.py<br/>currently used by main.py"]
-    inline_search["Inline search helpers<br/>get_tavily_client()<br/>format_search_results()<br/>search_with_domains()"]
-    node1["Graph search nodes<br/>search_agent_1_sources<br/>search_agent_2_verification_sources"]
+    graph_nodes["Graph search nodes<br/>search_agent_1_sources<br/>search_agent_2_verification_sources"]
+    evidence_node["Evidence node<br/>grade_evidence_and_clarify"]
 
-    tools["src/tools/Web_search.py<br/>standalone helper module"]
+    tools["src/tools/Web_search.py<br/>structured helper module"]
+    source_type["SearchSource<br/>label, title, URL,<br/>content, source_type"]
     official_helper["search_official_tax_sources()"]
     reddit_helper["search_reddit_context()"]
-    all_helper["search_all_tax_sources()"]
-    verify_helper["search_verification_sources()"]
+    formatter["format_search_results()<br/>format_source_list()"]
 
     tavily["Tavily API"]
     official["ATO/TPB domains"]
     reddit["Reddit domain"]
 
-    workflow --> inline_search --> node1 --> tavily
+    workflow --> graph_nodes
+    workflow --> evidence_node
+    graph_nodes --> tools
+    tools --> source_type
     tools --> official_helper --> tavily
     tools --> reddit_helper --> tavily
-    tools --> all_helper --> tavily
-    tools --> verify_helper --> tavily
+    tools --> formatter
     tavily --> official
     tavily -. "optional context" .-> reddit
 
@@ -304,8 +317,8 @@ flowchart TD
     classDef search fill:#cffafe,stroke:#0891b2,color:#164e63,stroke-width:3px
     classDef external fill:#ffe4e6,stroke:#e11d48,color:#881337,stroke-width:3px
 
-    class workflow,node1 active
-    class inline_search,tools,official_helper,reddit_helper,all_helper,verify_helper helper
+    class workflow,graph_nodes,evidence_node active
+    class tools,source_type,official_helper,reddit_helper,formatter helper
     class tavily search
     class official,reddit external
 ```
@@ -315,11 +328,11 @@ flowchart TD
 | File | Main responsibility | Easy explanation |
 | --- | --- | --- |
 | `main.py` | Terminal entry point | Shows the welcome/disclaimer, asks for a tax question, asks whether to include Reddit, runs the LangGraph workflow, and prints the final answer or error. |
-| `src/graph_workflow.py` | Main application workflow | Defines the shared graph state, search functions, four LangGraph nodes, graph edges, and `run_langgraph_tax_agent()`. |
-| `src/prompts.py` | Prompt library | Stores the CA guidance prompt and compliance review prompt, including official-source and Reddit rules. |
+| `src/graph_workflow.py` | Main application workflow | Defines the shared graph state, evidence grading, clarification checks, five LangGraph nodes, graph edges, and `run_langgraph_tax_agent()`. |
+| `src/prompts.py` | Prompt library | Stores the CA guidance prompt and compliance review prompt, including official-source, Reddit, citation, evidence, and clarification rules. |
 | `src/llm.py` | LLM setup | Builds the Gemini client for Agent 1, the Groq client for Agent 2, and extracts response text. |
 | `src/config.py` | Settings loader | Loads `.env`, validates required API keys, and stores model/search/tax settings. |
-| `src/tools/Web_search.py` | Search helper module | Contains reusable Tavily helper functions for official-source, Reddit, combined, and verification searches. The current graph duplicates some search logic inline. |
+| `src/tools/Web_search.py` | Search helper module | Contains reusable Tavily helper functions that return structured `SearchSource` records and format them for prompts and source lists. |
 | `requirements.txt` | Runtime dependencies | Lists the smaller current runtime package set. |
 | `uv.lock` | Dependency lockfile | Records resolved dependency versions from uv. |
 
@@ -327,4 +340,4 @@ flowchart TD
 
 The current app starts in `main.py`. It asks the user for a question and asks whether Reddit context should be included. Then it calls `run_langgraph_tax_agent()` from `src/graph_workflow.py`.
 
-The LangGraph workflow runs four nodes in order. First it searches official ATO/TPB sources, and optionally Reddit. Then Gemini creates Agent 1's first tax answer. Next, the workflow searches fresh official sources to verify Agent 1's answer, again optionally adding Reddit context. Finally, Groq creates the compliance-reviewed final answer, which `main.py` prints in the terminal.
+The LangGraph workflow runs five nodes in order. First it searches official ATO/TPB sources, and optionally Reddit, keeping the results as structured citation records. Next it grades the evidence strength and identifies missing facts that could change the tax answer. Gemini then creates Agent 1's first answer using those citation labels and clarification notes. The workflow searches fresh official sources to verify Agent 1's answer, again optionally adding Reddit context. Finally, Groq creates the compliance-reviewed final answer with a mandatory "Sources checked" section, which `main.py` prints in the terminal.

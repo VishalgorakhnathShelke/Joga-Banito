@@ -41,10 +41,33 @@ Official ATO/TPB source material:
 Reddit/public discussion context:
 {reddit_context}
 
+Evidence grade:
+{evidence_grade}
+
+Evidence summary:
+{evidence_summary}
+
+Needs clarification?
+{needs_clarification}
+
+Clarification questions or missing facts:
+{clarification_questions}
+
 Reddit instruction:
 If Reddit was included, you may mention what people are discussing, but you must
 clearly say Reddit is not official tax guidance. Do not use Reddit as evidence
 that something is claimable.
+
+Citation instruction:
+- Official sources are labelled like [OFFICIAL-A1-1] or [OFFICIAL-A2-1].
+- Cite the official source label beside each important tax claim.
+- Do not cite Reddit labels as legal or tax evidence.
+- If the official sources do not support a claim, say the claim needs confirmation.
+
+Clarification instruction:
+- If needs_clarification is True, explain which missing facts could change the answer.
+- Do not invent missing facts.
+- Give only conservative general guidance until the missing facts are known.
 
 Now give Agent 1's first tax guidance answer.
 """
@@ -92,6 +115,24 @@ Fresh Reddit/public discussion context:
 Include Reddit section?
 {include_reddit}
 
+Evidence grade:
+{evidence_grade}
+
+Evidence summary:
+{evidence_summary}
+
+Needs clarification?
+{needs_clarification}
+
+Clarification questions or missing facts:
+{clarification_questions}
+
+Official source citations available:
+{official_source_citations}
+
+Reddit/public discussion citations available:
+{reddit_source_citations}
+
 Important Reddit rule:
 - If include_reddit is True, include a separate section called:
   "Reddit/public discussion context".
@@ -99,6 +140,17 @@ Important Reddit rule:
 - Clearly say Reddit is not official tax guidance.
 - Do not use Reddit as final evidence.
 - If include_reddit is False, do not include a Reddit section.
+
+Mandatory citation rules:
+- Every important official-source-based tax claim must include at least one official citation label like [OFFICIAL-A1-1] or [OFFICIAL-A2-1].
+- Do not cite Reddit as tax law or official evidence.
+- If a claim cannot be tied to an official citation, mark it as unsupported or requiring registered tax agent confirmation.
+- Include exact official URLs in the final "Sources checked" section.
+
+Evidence and clarification rules:
+- If evidence_grade is Very weak or Limited, choose "Unclear", "Risky", or "Needs registered tax agent confirmation" unless the answer is plainly about general process.
+- If needs_clarification is True, include the clarification questions and explain how the missing facts could change the decision.
+- Do not make a firm "Can do" decision when missing facts are material.
 
 Now produce the final answer using this exact structure:
 
@@ -135,7 +187,9 @@ Only include this section if include_reddit is True.
 
 12. Final recommendation
 
-13. Disclaimer
+13. Sources checked
+
+14. Disclaimer
 
 Important:
 - Be conservative.

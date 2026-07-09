@@ -11,8 +11,11 @@ JogaBanito is a terminal-based LangGraph app that accepts an Australian tax ques
 - Collects an Australian tax-related question from the terminal.
 - Searches official Australian Taxation Office and Tax Practitioners Board sources.
 - Optionally searches Reddit for public discussion context.
-- Uses Gemini as Agent 1 to draft tax guidance.
-- Uses Groq as Agent 2 to verify, correct, and make the answer more compliance-safe.
+- Keeps search results as structured source records with citation labels.
+- Grades the strength of official evidence before the first answer is drafted.
+- Identifies missing facts that may need clarification.
+- Uses Gemini as Agent 1 to draft cited tax guidance.
+- Uses Groq as Agent 2 to verify, correct, cite, and make the answer more compliance-safe.
 - Prints a structured final answer with a disclaimer.
 
 ## Current Workflow
@@ -21,20 +24,21 @@ JogaBanito is a terminal-based LangGraph app that accepts an Australian tax ques
 User question
   -> Tavily search: ATO/TPB sources
   -> Optional Tavily search: Reddit context
-  -> Gemini Agent 1: first tax guidance answer
+  -> Evidence grading + clarification check
+  -> Gemini Agent 1: first cited tax guidance answer
   -> Tavily search: fresh verification sources
-  -> Groq Agent 2: compliance review
-  -> Final reviewed guidance
+  -> Groq Agent 2: compliance review with source citations
+  -> Final reviewed guidance with Sources checked
 ```
 
 The implementation lives mainly in:
 
 - `main.py` - terminal entry point and Rich console UI.
-- `src/graph_workflow.py` - LangGraph workflow and node definitions.
+- `src/graph_workflow.py` - LangGraph workflow, evidence grading, clarification checks, and node definitions.
 - `src/config.py` - environment loading and app settings.
 - `src/llm.py` - Gemini and Groq client setup.
-- `src/prompts.py` - Agent 1 and Agent 2 prompt templates.
-- `src/tools/Web_search.py` - reusable Tavily search helpers, currently not wired into the main workflow.
+- `src/prompts.py` - Agent 1 and Agent 2 prompt templates with citation rules.
+- `src/tools/Web_search.py` - reusable Tavily search helpers that return structured source records.
 - `ARCHITECTURE_DIAGRAMS.md` - detailed architecture and flow diagrams.
 
 ## Requirements
@@ -106,7 +110,11 @@ The app is designed to be conservative:
 
 - Official ATO/TPB material is the primary evidence source.
 - Reddit can only be included as public discussion context.
+- Official source results are labelled for citations, such as `[OFFICIAL-A1-1]` and `[OFFICIAL-A2-1]`.
+- Evidence strength is graded before Agent 1 drafts an answer.
+- Missing facts are passed into the agents as clarification questions.
 - Agent 2 checks Agent 1 for unsupported claims, false confidence, compliance risk, and missing evidence.
+- Agent 2 must include a "Sources checked" section with official URLs.
 - The final answer asks users to confirm important filing decisions with a registered tax agent where appropriate.
 
 ## Project Structure
@@ -128,7 +136,17 @@ JogaBanito/
 `-- README.md
 ```
 
-## Suggestions To Improve
+## Implemented Agentic Safeguards
+
+These safeguards make the project more trustworthy as an agent system:
+
+- Structured source records: search results now keep labels, titles, URLs, content, and source type.
+- Mandatory citation prompting: important official-source-based tax claims must cite labels like `[OFFICIAL-A1-1]`.
+- Evidence grading: the graph grades whether official evidence is strong, moderate, limited, or very weak.
+- Clarification checks: the graph identifies missing facts such as tax year, work-use percentage, logbook details, or evidence records.
+- Final source list: Agent 2 is instructed to include a "Sources checked" section with exact official URLs.
+
+## Suggestions To Improve Next
 
 ### 1. Align Dependency Files
 
@@ -157,17 +175,7 @@ Suggested fix:
 
 This is the common convention and makes setup easier for new contributors.
 
-### 3. Reuse The Search Helper Module
-
-`src/graph_workflow.py` defines its own Tavily search helpers, while `src/tools/Web_search.py` also contains reusable search logic.
-
-Suggested fix:
-
-- Rename `src/tools/Web_search.py` to `src/tools/web_search.py`.
-- Import and reuse those functions inside `src/graph_workflow.py`.
-- Keep all Tavily/domain search behavior in one place.
-
-### 4. Add Tests Around The Workflow
+### 3. Add Tests Around The Workflow
 
 There are no tests yet, but this app has several important behaviors that should not regress.
 
@@ -178,20 +186,12 @@ Good first tests:
 - Reddit context is included only in a separate section when requested.
 - Search formatting handles missing titles, URLs, and content.
 - Agent 2 prompt receives the Agent 1 answer and fresh verification sources.
+- Evidence grading behaves conservatively when official sources are weak.
+- Clarification questions appear when key facts are missing.
 
 Use mocks for Tavily, Gemini, and Groq so tests do not call live APIs.
 
-### 5. Add Source Citations To Final Answers
-
-The search results include URLs, but the final answer relies on the model to preserve source context.
-
-Suggested fix:
-
-- Carry structured source metadata through the graph state.
-- Ask the final agent to cite specific ATO/TPB URLs in each key claim.
-- Add a final "Sources checked" section.
-
-### 6. Improve Error Handling
+### 4. Improve Error Handling
 
 The terminal currently catches broad exceptions and prints the error text.
 
@@ -202,7 +202,7 @@ Suggested improvements:
 - Separate user-facing errors from debug logs.
 - Add retry/backoff for transient search or model failures.
 
-### 7. Add Logging And Traceability
+### 5. Add Logging And Traceability
 
 For a compliance-oriented app, it helps to know what happened during a run.
 
@@ -212,7 +212,7 @@ Suggested improvements:
 - Avoid logging user secrets or sensitive tax documents.
 - Store optional run summaries in `outputs/` for debugging.
 
-### 8. Add A Non-Interactive CLI Mode
+### 6. Add A Non-Interactive CLI Mode
 
 The app currently uses `input()`, which is friendly for demos but harder to automate.
 
@@ -224,7 +224,7 @@ python main.py --question "Can I claim a laptop?" --include-reddit false
 
 This would make the project easier to test, script, and integrate into other tools.
 
-### 9. Add Guardrails For Tax Scope
+### 7. Add Guardrails For Tax Scope
 
 The prompts are tax-focused, but the app can still accept unrelated questions.
 
@@ -232,9 +232,9 @@ Suggested improvements:
 
 - Add a lightweight classifier node before search.
 - Reject clearly non-tax questions.
-- Ask a clarifying question when the tax year, residency, work/private-use split, or document evidence is missing.
+- Add an interactive follow-up mode when clarification questions are detected.
 
-### 10. Prepare For Document Uploads Later
+### 8. Prepare For Document Uploads Later
 
 The `.gitignore` already excludes sensitive uploaded documents, and the environment example mentions uploads and outputs.
 

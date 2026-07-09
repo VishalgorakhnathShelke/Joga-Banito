@@ -81,8 +81,9 @@ def main() -> None:
 
     console.print("\n[yellow]Running LangGraph tax guidance workflow...[/yellow]")
     console.print("[yellow]Step 1: Searching official sources...[/yellow]")
-    console.print("[yellow]Step 2: Running Agent 1...[/yellow]")
-    console.print("[yellow]Step 3: Verifying with Agent 2...[/yellow]\n")
+    console.print("[yellow]Step 2: Grading evidence and checking missing facts...[/yellow]")
+    console.print("[yellow]Step 3: Running Agent 1...[/yellow]")
+    console.print("[yellow]Step 4: Verifying with Agent 2...[/yellow]\n")
 
     try:
         final_answer = run_langgraph_tax_agent(

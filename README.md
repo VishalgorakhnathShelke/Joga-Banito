@@ -266,5 +266,7 @@ ruff check .
 ```
 
 ## Important Disclaimer
-
+----------------------------------------------------------------------------------------------------------------------------------------------
 This project is an educational AI assistant for Australian tax guidance. It does not provide professional tax advice and should not be used as the sole basis for lodging a tax return. Users should confirm final decisions with a registered tax agent, especially for complex, high-value, or uncertain claims.
+-----------------------------------------------------------------------------------------------------------------------------------------------
+got it ?
